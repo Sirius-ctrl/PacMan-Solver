@@ -2,3 +2,7 @@
 .DS_Store
 
 *.o
+
+base_code/error.txt
+
+base_code/re.txt

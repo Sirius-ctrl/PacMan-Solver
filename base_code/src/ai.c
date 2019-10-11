@@ -67,39 +67,78 @@ node_t* create_init_node( state_t* init_state ){
 	new_n->num_childs = 0;
 	copy_state(&(new_n->state), init_state);
 	new_n->acc_reward =  get_reward( new_n );
+	// -1 represent no movement
+	new_n->move = -1;
 	return new_n;
 	
 }
 
 
 float heuristic( node_t* n ){
-	float h = 0;
-	
-	//FILL IN MISSING CODE
+	float i=0.0,l=0.0,g=0.0;
 
-	return h;
+	// if game over
+	if((n->state).Lives == 0){
+		g = 100.0;
+	}
+
+	if(n->parent == NULL){
+		perror("no parents has been found");
+		exit(EXIT_FAILURE);
+	}
+
+	// retrive the parent node as it must exist
+	node_t* parent = n->parent;
+
+	//if we lost a life
+	if((n->state).Lives < (parent->state).Lives){
+		l = 10.0;
+	}
+
+	// if the last state is not invincible but becomes invincible now
+	if((n->state).Invincible && (!(parent->state).Invincible)){
+		i = 10;
+	}
+
+	return i-l-g;
 }
 
 float get_reward ( node_t* n ){
-	float reward = 0;
-	
-	//FILL IN MISSING CODE
+	// new node has no reward assigned
+	if(n->parent == NULL) {
+		return 0;
+	}
 
-	float discount = pow(0.99,n->depth);
-   	
+	float reward = 0;
+	float h = heuristic(n);
+	float score_changes = (n->state).Points - (n->parent->state).Points;
+	float discount = pow(0.99, n->depth);
+
+	reward = h + score_changes;
+	
 	return discount * reward;
 }
 
 /**
  * Apply an action to node n and return a new node resulting from executing the action
 */
-bool applyAction(node_t* n, node_t** new_node, move_t action ){
+bool applyAction(node_t* curr_node, node_t* child_node, move_t action ){
 
 	bool changed_dir = false;
 
-    //FILL IN MISSING CODE
+	// testing if the action is valid and update the state
+    changed_dir = execute_move_t( &((child_node)->state), action );
 
-    changed_dir = execute_move_t( &((*new_node)->state), action );	
+	// only doing the following things if "action" is valid
+	if(changed_dir) {
+		// update all node properties
+		child_node->parent = curr_node;
+		++(curr_node->num_childs);
+		child_node->depth = curr_node->depth + 1;
+		child_node->priority = curr_node->priority - 1;
+		child_node->move = action;
+		child_node->acc_reward = get_reward(child_node);
+	}
 
 	return changed_dir;
 
@@ -110,31 +149,106 @@ bool applyAction(node_t* n, node_t** new_node, move_t action ){
  * Find best action by building all possible paths up to budget
  * and back propagate using either max or avg
  */
-
 move_t get_next_move( state_t init_state, int budget, propagation_t propagation, char* stats ){
-	move_t best_action = rand() % 4;
+	float best_action_score[DIRECTIONS];
 
-	float best_action_score[4];
-	for(unsigned i = 0; i < 4; i++)
-	    best_action_score[i] = INT_MIN;
+	for (unsigned i = 0; i < DIRECTIONS; i++) {
+		best_action_score[i] = 0;
+	}
+	 
 
+	// printing stats
 	unsigned generated_nodes = 0;
 	unsigned expanded_nodes = 0;
 	unsigned max_depth = 0;
-	
 
+	unsigned curr_size = INIT_SIZE_OF_EXPLORED;
+	unsigned curr_used = 0;
+	node_t **explored = (node_t **)malloc(INIT_SIZE_OF_EXPLORED*sizeof(node_t*));
 
-	//Add the initial node
-	//node_t* n = create_init_node( &init_state );
-	
-	//Use the max heap API provided in priority_queue.h
-	//heap_push(&h,n);
-	
-	//FILL IN THE GRAPH ALGORITHM
-	
+	//initialize the node and add to frontier
+	node_t *init_node = create_init_node(&init_state);
+	heap_push(&h, init_node);
+
+	while(h.count != 0){
+		node_t* curr_node = heap_delete(&h);
+
+		if(curr_node->depth > max_depth) { max_depth=curr_node->depth; }
+
+		// resize the array if it already reach its maximum capacity
+		if(curr_used == curr_size){
+			curr_size *= 2;
+			explored = (node_t **)realloc(explored, sizeof(node_t*) * curr_size);
+		}
+		explored[curr_used++] = curr_node;
+
+		// if we haven't reach the budget yet
+		if(expanded_nodes < budget) {
+			++expanded_nodes;
+			// the child nodes for the current parent node
+			// in left, right, up, down sequence of direction, which is the same
+			// as the enum defined in utils (left=0, right=1, up=2, down=3)
+			node_t *direction_node[DIRECTIONS];
+			// create four copies of the current state for each direction
+			for (unsigned i = 0; i < DIRECTIONS; i++) {
+				direction_node[i] = create_init_node(&(curr_node->state));
+				if( applyAction(curr_node, direction_node[i], i) ){
+					++generated_nodes;
+
+					// propagate score back
+					if (propagation == max) {
+						node_t *trace_node = direction_node[i];
+
+						while(trace_node->depth != 1) {
+							trace_node = trace_node->parent;
+						}
+
+						if (best_action_score[trace_node->move] < direction_node[i]->acc_reward) {
+							best_action_score[trace_node->move] = direction_node[i]->acc_reward;
+						}
+					} else if (propagation == avg) {
+						// TODO: implement the avg score
+						fprintf(stderr, "Current d = %d\n", curr_node->depth);
+						exit(EXIT_FAILURE);
+					} else {
+						fprintf(stderr, "Invalid propagate mode!");
+						exit(EXIT_FAILURE);
+					}
+
+					if( (direction_node[i]->state).Lives == curr_node->state.Lives) {
+						heap_push(&h, direction_node[i]);
+					} else {
+						// remove the node as it lost a life
+						free(direction_node[i]);
+					}
+				} else {
+					// remove the node as it is not a valid movement
+					free(direction_node[i]);
+				}
+			}
+		}
+	}
+
+	// free the memory of explored node and free explored itself
+	for (unsigned i = 0; i < curr_used; i++){
+		free(explored[i]);
+	}
+	free(explored);
 	
 	sprintf(stats, "Max Depth: %d Expanded nodes: %d  Generated nodes: %d\n",max_depth,expanded_nodes,generated_nodes);
 	
+	// retrive the action has the best score overall
+	move_t best_action = left;
+	float best_score = best_action_score[0];
+
+	for (unsigned i = 1; i < DIRECTIONS; i++) {
+		if(best_action_score[i] > best_score) {
+			best_score = best_action_score[i];
+			best_action = i;
+		}
+	}
+	
+
 	if(best_action == left)
 		sprintf(stats, "%sSelected action: Left\n",stats);
 	if(best_action == right)

@@ -5,7 +5,8 @@
 #include <unistd.h>
 #include "node.h"
 #include "priority_queue.h"
-
+#define INIT_SIZE_OF_EXPLORED 100
+#define DIRECTIONS 4
 
 void initialize_ai();
 
