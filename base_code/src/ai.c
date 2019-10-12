@@ -69,10 +69,6 @@ node_t* create_init_node( state_t* init_state ){
 	new_n->acc_reward =  get_reward( new_n );
 	// -1 represent no movement
 	new_n->move = -1;
-	// initalise the children reward
-	for (unsigned i = 0; i < DIRECTIONS; i++) {
-		new_n->children_rewards[i] = -1;
-	}
 	
 	return new_n;
 	
@@ -108,6 +104,8 @@ float heuristic( node_t* n ){
 	return i-l-g;
 }
 
+
+
 float get_reward ( node_t* n ){
 	// new node has no reward assigned
 	if(n->parent == NULL) {
@@ -124,6 +122,7 @@ float get_reward ( node_t* n ){
 	return discount * reward;
 }
 
+
 /**
  * Apply an action to node n and return a new node resulting from executing the action
 */
@@ -138,34 +137,28 @@ bool applyAction(node_t* curr_node, node_t* child_node, move_t action ){
 	if(changed_dir) {
 		// update all node properties
 		child_node->parent = curr_node;
-		++(curr_node->num_childs);
 		child_node->depth = curr_node->depth + 1;
 		child_node->priority = curr_node->priority - 1;
 		child_node->move = action;
 		child_node->acc_reward = get_reward(child_node);
+		node_t* trace_node = curr_node;
+		// update the child number and acc_reward all the way down to the init node
+		while (true) {
+			fprintf(stderr, "now we are at d=%d\n", trace_node->depth);
+			(trace_node->num_childs)++;
+			child_node->acc_reward += trace_node->acc_reward;
+			fprintf(stderr, "now d=%d has %d child\n", trace_node->depth, trace_node->num_childs);
+			if(trace_node->parent != NULL){
+				trace_node = trace_node->parent;
+			} else {
+				break;
+			}
+		}
+		
 	}
 
 	return changed_dir;
 
-}
-
-/* 
- * calculate the average reward of the children nodes of a node
- */
-float calculate_child_avg(node_t* node) {
-	int counter = 0;
-	float accumulater = 0;
-
-	for (unsigned i = 0; i < DIRECTIONS; i++) {
-		//fprintf(stderr, "i=%d, node->children_rewards[i] = %f ", i, node->children_rewards[i]);
-
-		if (node->children_rewards[i] != -1) {
-			accumulater += node->children_rewards[i];
-			counter++;
-		}
-	}
-	//fprintf(stderr, "\ncounter = %d, accumlater = %f, res=%f d=%d\n", counter, accumulater, accumulater / counter, node->depth);
-	return accumulater / counter;
 }
 
 
@@ -180,8 +173,7 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 	for (unsigned i = 0; i < DIRECTIONS; i++) {
 		best_action_score[i] = -1;
 	}
-	 
-
+	
 	// printing stats
 	unsigned generated_nodes = 0;
 	unsigned expanded_nodes = 0;
@@ -228,31 +220,33 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 							trace_node = trace_node->parent;
 						}
 
-						if (best_action_score[trace_node->move] < direction_node[i]->acc_reward) {
-							best_action_score[trace_node->move] = direction_node[i]->acc_reward;
+						if (best_action_score[trace_node->move] < direction_node[i]->state.Points) {
+							best_action_score[trace_node->move] = direction_node[i]->state.Points;
 						}
 					} else if (propagation == avg) {
-						
 						if(curr_node->depth == 0){
-							// if the parent of the current node is root, we can simply assign the value
-							// to best_action_score which is equivelent to assign it to children_rewards
-							best_action_score[direction_node[i]->move] = direction_node[i]->acc_reward;
+							best_action_score[direction_node[i]->move] = direction_node[i]->state.Points;
 						} else {
-							// if the parent of the current node is not the root, we have to trace back
-							// and update the reward along the path
-							curr_node->children_rewards[i] = direction_node[i]->acc_reward;
-							node_t* trace_node = curr_node;
-							while(true) {
-								float curr_avg = calculate_child_avg(trace_node);
-								if(trace_node->parent->depth == 0){
-									best_action_score[trace_node->move] = curr_avg;
+							node_t *trace_node = curr_node;
+
+							while (true) {
+								if (trace_node->depth == 1) {
+									move_t side = trace_node->move;
+									int child_nums = trace_node->num_childs;
+									
+									// the child shouldn't be zero (for debuging purpose)
+									if (child_nums <= 0) {
+										exit(EXIT_FAILURE);
+									}
+
+									best_action_score[side] = (best_action_score[side] * (child_nums) + direction_node[i]->state.Points) / (child_nums+1);
 									break;
 								} else {
 									trace_node = trace_node->parent;
 								}
 							}
-
 						}
+
 					} else {
 						fprintf(stderr, "Invalid propagate mode!");
 						exit(EXIT_FAILURE);
@@ -296,8 +290,17 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 		}
 	}
 
+	//if there are multiple best score, try to break tie randomly
+	int res[4];
+	int max_num=0;
+	for (unsigned i = 0; i < DIRECTIONS; i++) {
+		if(best_action_score[i] == best_score){
+			res[max_num++] = i;
+		}
+	}
+	best_action = res[rand() % max_num];
+
 	fprintf(stderr, "\n final choice is %d", best_action);
-	
 
 	if(best_action == left)
 		sprintf(stats, "%sSelected action: Left\n",stats);
