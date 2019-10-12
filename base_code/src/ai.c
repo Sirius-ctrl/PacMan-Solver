@@ -69,6 +69,11 @@ node_t* create_init_node( state_t* init_state ){
 	new_n->acc_reward =  get_reward( new_n );
 	// -1 represent no movement
 	new_n->move = -1;
+	// initalise the children reward
+	for (unsigned i = 0; i < DIRECTIONS; i++) {
+		new_n->children_rewards[i] = -1;
+	}
+	
 	return new_n;
 	
 }
@@ -144,16 +149,36 @@ bool applyAction(node_t* curr_node, node_t* child_node, move_t action ){
 
 }
 
+/* 
+ * calculate the average reward of the children nodes of a node
+ */
+float calculate_child_avg(node_t* node) {
+	int counter = 0;
+	float accumulater = 0;
+
+	for (unsigned i = 0; i < DIRECTIONS; i++) {
+		//fprintf(stderr, "i=%d, node->children_rewards[i] = %f ", i, node->children_rewards[i]);
+
+		if (node->children_rewards[i] != -1) {
+			accumulater += node->children_rewards[i];
+			counter++;
+		}
+	}
+	//fprintf(stderr, "\ncounter = %d, accumlater = %f, res=%f d=%d\n", counter, accumulater, accumulater / counter, node->depth);
+	return accumulater / counter;
+}
+
 
 /**
  * Find best action by building all possible paths up to budget
  * and back propagate using either max or avg
  */
 move_t get_next_move( state_t init_state, int budget, propagation_t propagation, char* stats ){
+	fprintf(stderr, "------------------------\n");
 	float best_action_score[DIRECTIONS];
 
 	for (unsigned i = 0; i < DIRECTIONS; i++) {
-		best_action_score[i] = 0;
+		best_action_score[i] = -1;
 	}
 	 
 
@@ -207,20 +232,40 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 							best_action_score[trace_node->move] = direction_node[i]->acc_reward;
 						}
 					} else if (propagation == avg) {
-						// TODO: implement the avg score
-						fprintf(stderr, "Current d = %d\n", curr_node->depth);
-						exit(EXIT_FAILURE);
+						
+						if(curr_node->depth == 0){
+							// if the parent of the current node is root, we can simply assign the value
+							// to best_action_score which is equivelent to assign it to children_rewards
+							best_action_score[direction_node[i]->move] = direction_node[i]->acc_reward;
+						} else {
+							// if the parent of the current node is not the root, we have to trace back
+							// and update the reward along the path
+							curr_node->children_rewards[i] = direction_node[i]->acc_reward;
+							node_t* trace_node = curr_node;
+							while(true) {
+								float curr_avg = calculate_child_avg(trace_node);
+								if(trace_node->parent->depth == 0){
+									best_action_score[trace_node->move] = curr_avg;
+									break;
+								} else {
+									trace_node = trace_node->parent;
+								}
+							}
+
+						}
 					} else {
 						fprintf(stderr, "Invalid propagate mode!");
 						exit(EXIT_FAILURE);
 					}
 
+					// push the new node to our priority queue
 					if( (direction_node[i]->state).Lives == curr_node->state.Lives) {
 						heap_push(&h, direction_node[i]);
 					} else {
 						// remove the node as it lost a life
 						free(direction_node[i]);
 					}
+
 				} else {
 					// remove the node as it is not a valid movement
 					free(direction_node[i]);
@@ -241,12 +286,17 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 	move_t best_action = left;
 	float best_score = best_action_score[0];
 
+	fprintf(stderr, "best_action_score[0]=%f  ", best_score);
+
 	for (unsigned i = 1; i < DIRECTIONS; i++) {
-		if(best_action_score[i] > best_score) {
+		fprintf(stderr, "best_action_score[%d]=%f  ", i, best_action_score[i]);
+		if (best_action_score[i] > best_score) {
 			best_score = best_action_score[i];
 			best_action = i;
 		}
 	}
+
+	fprintf(stderr, "\n final choice is %d", best_action);
 	
 
 	if(best_action == left)
