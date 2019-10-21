@@ -84,7 +84,7 @@ bool ai_pause = false; // To check stats of every action
 propagation_t propagation; //Propagation type
 state_t current_state; //Contains a copy of the current game state
 char ai_stats[500]; //Info printed out about AI algorithm
-
+output_t output_stats; //Info write to output.txt for further analysis
 
 void print_usage(){
     printf("To run the AI solver: \n");
@@ -455,7 +455,25 @@ void ExitProgram(const char *message) {
     endwin();                       //Uninitialize ncurses and destroy windows
     printf("%s\n", message);        //Display message
     printf("Final Score: %d\n",Points);
-    exit(0);                        //End program, return 0
+    
+
+    //print the output analysis data to output.txt
+    char res[500];
+    if(propagation == max) {
+        sprintf(res, "Propagation = Max\n");
+    } else {
+        sprintf(res, "Propagation = Avg\n");
+    }
+
+    int expanded_per_sec = output_stats.total_expanded/output_stats.time;
+
+    sprintf(res, "%sBudget = %d\nMaxDepth = %d\nTotalGenerated = %d\nTotalExpanded = %d\nTime = %f\nExpanded/Second = %d\nScore = %d\n",
+            res, budget, output_stats.max_depth, output_stats.total_generated, output_stats.total_expanded, output_stats.time, 
+            expanded_per_sec, Points);
+
+    write_to_file("output.txt", res);
+
+    exit(0); //End program, return 0
 }
 
 /****************************************************************
@@ -784,9 +802,16 @@ void MainLoop() {
     wrefresh(win); wrefresh(status); //Refresh it just to make sure
     usleep(1000000);                 //Pause for a second so they know they're about to play
 
+    // initialise the output stats
+    output_stats.max_depth = 0;
+    output_stats.time = 0;
+    output_stats.total_expanded = 0;
+    output_stats.total_generated = 0;
+
     /* Move Pacman. Move ghosts. Check for extra life awarded
     from points. Pause for a brief moment. Repeat until all pellets are eaten */
     do {
+        clock_t start, end;
 
         MovePacman();    DrawWindow();    CheckCollision();
         MoveGhosts();    DrawWindow();    CheckCollision();
@@ -798,11 +823,21 @@ void MainLoop() {
 	    if(ai_run){
 
             update_current_state();
-
+            start = clock();
             /**
              * ****** HERE IS WHERE YOUR SOLVER IS CALLED
              */
-            move_t selected_move = get_next_move( current_state, budget, propagation, ai_stats );
+            move_t selected_move = get_next_move( current_state, budget, propagation, ai_stats, &output_stats );
+
+            end = clock();
+
+            output_stats.time += ((double)(end - start)) / CLOCKS_PER_SEC;
+
+            fprintf(stderr, "\ntime consumed=%f\n", output_stats.time);
+            fprintf(stderr, "total generated=%d\n", output_stats.total_generated);
+            fprintf(stderr, "max_depth=%d\n", output_stats.max_depth);
+            fprintf(stderr, "total expanded=%d\n", output_stats.total_expanded);
+            fprintf(stderr, "expanded/sec=%f\n", output_stats.total_expanded/output_stats.time);
 
             /**
              * Execute the selected action

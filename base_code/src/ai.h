@@ -10,6 +10,6 @@
 
 void initialize_ai();
 
-move_t get_next_move( state_t init_state, int budget, propagation_t propagation, char* stats );
+move_t get_next_move( state_t init_state, int budget, propagation_t propagation, char* stats , output_t* output);
 
 #endif

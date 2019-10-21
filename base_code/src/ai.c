@@ -144,10 +144,10 @@ bool applyAction(node_t* curr_node, node_t* child_node, move_t action ){
 		node_t* trace_node = curr_node;
 		// update the child number and acc_reward all the way down to the init node
 		while (true) {
-			fprintf(stderr, "now we are at d=%d\n", trace_node->depth);
+			//fprintf(stderr, "now we are at d=%d\n", trace_node->depth);
 			(trace_node->num_childs)++;
 			child_node->acc_reward += trace_node->acc_reward;
-			fprintf(stderr, "now d=%d has %d child\n", trace_node->depth, trace_node->num_childs);
+			//fprintf(stderr, "now d=%d has %d child\n", trace_node->depth, trace_node->num_childs);
 			if(trace_node->parent != NULL){
 				trace_node = trace_node->parent;
 			} else {
@@ -166,7 +166,7 @@ bool applyAction(node_t* curr_node, node_t* child_node, move_t action ){
  * Find best action by building all possible paths up to budget
  * and back propagate using either max or avg
  */
-move_t get_next_move( state_t init_state, int budget, propagation_t propagation, char* stats ){
+move_t get_next_move( state_t init_state, int budget, propagation_t propagation, char* stats, output_t* output_stats ){
 	fprintf(stderr, "------------------------\n");
 	float best_action_score[DIRECTIONS];
 
@@ -275,6 +275,10 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 	free(explored);
 	
 	sprintf(stats, "Max Depth: %d Expanded nodes: %d  Generated nodes: %d\n",max_depth,expanded_nodes,generated_nodes);
+
+	if(max_depth > output_stats->max_depth) {output_stats->max_depth = max_depth;}
+	output_stats->total_expanded += expanded_nodes;
+	output_stats->total_generated += generated_nodes;
 	
 	// retrieve the action has the best score overall
 	move_t best_action = left;

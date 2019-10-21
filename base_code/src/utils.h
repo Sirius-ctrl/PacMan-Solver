@@ -55,7 +55,19 @@ typedef enum propagation{
 	avg=1
 } propagation_t;
 
+struct output_s{
+    unsigned max_depth;
+    unsigned total_generated;
+    unsigned total_expanded;
+    double time;
+};
 
+typedef struct output_s output_t;
+
+/*
+ * this function can write data into filepath
+ */
+void write_to_file(char *filepath, char *data);
 
 /**
  * Executes an action, updates the board and the score, and return true if the direction of Pacman has changed,

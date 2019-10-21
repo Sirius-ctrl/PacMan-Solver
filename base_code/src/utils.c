@@ -2,6 +2,15 @@
 #include "utils.h"
 #include "pacman.h"
 
+
+void write_to_file(char *filepath, char *data) {
+    FILE *fp = fopen(filepath, "wb");
+    if (fp != NULL) {
+        fputs(data, fp);
+        fclose(fp);
+    }
+}
+
 bool execute_move_t(state_t* state, move_t move) {
 
     int ch;                         //Key pushed
