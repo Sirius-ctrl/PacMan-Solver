@@ -79,7 +79,7 @@ float heuristic( node_t* n ){
 	float i=0.0,l=0.0,g=0.0;
 
 	// if game over
-	if((n->state).Lives == 0){
+	if((n->state).Lives == -1){
 		g = 100.0;
 	}
 
@@ -133,7 +133,7 @@ bool applyAction(node_t* curr_node, node_t* child_node, move_t action ){
 	// testing if the action is valid and update the state
     changed_dir = execute_move_t( &((child_node)->state), action );
 
-	// only doing the following things if "action" is valid
+	// only do the following things if "action" is valid
 	if(changed_dir) {
 		// update all node properties
 		child_node->parent = curr_node;
@@ -192,14 +192,14 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 
 		if(curr_node->depth > max_depth) { max_depth=curr_node->depth; }
 
-		// resize the array if it already reach its maximum capacity
+		// resize the array if it has already reached its maximum capacity
 		if(curr_used == curr_size){
 			curr_size *= 2;
 			explored = (node_t **)realloc(explored, sizeof(node_t*) * curr_size);
 		}
 		explored[curr_used++] = curr_node;
 
-		// if we haven't reach the budget yet
+		// if we haven't reached the budget yet
 		if(expanded_nodes < budget) {
 			++expanded_nodes;
 			// the child nodes for the current parent node
@@ -256,7 +256,7 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 					if( (direction_node[i]->state).Lives == curr_node->state.Lives) {
 						heap_push(&h, direction_node[i]);
 					} else {
-						// remove the node as it lost a life
+						// remove the node as it losts a life
 						free(direction_node[i]);
 					}
 
@@ -276,7 +276,7 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 	
 	sprintf(stats, "Max Depth: %d Expanded nodes: %d  Generated nodes: %d\n",max_depth,expanded_nodes,generated_nodes);
 	
-	// retrive the action has the best score overall
+	// retrieve the action has the best score overall
 	move_t best_action = left;
 	float best_score = best_action_score[0];
 
@@ -290,7 +290,7 @@ move_t get_next_move( state_t init_state, int budget, propagation_t propagation,
 		}
 	}
 
-	//if there are multiple best score, try to break tie randomly
+	//if there are multiple best scores, try to break tie randomly
 	int res[4];
 	int max_num=0;
 	for (unsigned i = 0; i < DIRECTIONS; i++) {
