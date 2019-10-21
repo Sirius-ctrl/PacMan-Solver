@@ -467,7 +467,7 @@ void ExitProgram(const char *message) {
 
     int expanded_per_sec = output_stats.total_expanded/output_stats.time;
 
-    sprintf(res, "%sBudget = %d\nMaxDepth = %d\nTotalGenerated = %d\nTotalExpanded = %d\nTime = %f\nExpanded/Second = %d\nScore = %d\n",
+    sprintf(res, "%sBudget = %d\nMaxDepth = %d\nTotalGenerated = %d\nTotalExpanded = %d\nTime = %f seconds\nExpanded/Second = %d\nScore = %d\n",
             res, budget, output_stats.max_depth, output_stats.total_generated, output_stats.total_expanded, output_stats.time, 
             expanded_per_sec, Points);
 

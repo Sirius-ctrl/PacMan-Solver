@@ -1,4 +1,4 @@
-Propagation=Avg
+Propagation = Avg
 Budget = 4000
 MaxDepth = 23
 TotalGenerated = 4620697
